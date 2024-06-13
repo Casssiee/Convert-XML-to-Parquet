@@ -1,0 +1,49 @@
+# Import packages
+import os
+import pandas as pd
+import xml.etree.ElementTree as ET
+
+# Process XML file (expand collection field if any)
+def process_xml_data(df, xml_column):
+    # Initialize a list to store the processed data
+    processed_data = []
+
+    # Iterate over each row in the DataFrame
+    for index, row in df.iterrows():
+        xml_string = row[xml_column]
+        
+        try:
+            # Parse the XML string
+            root = ET.fromstring(xml_string)
+        except ET.ParseError as e:
+            print(f"Error parsing XML at index {index}: {e}")
+            continue  # Skip to the next row on parse error
+
+        # Initialize a dictionary to store the processed row data
+        row_data = {}
+
+        # Iterate over each field in the XML
+        for field in root.findall(".//field"):
+            field_name = field.get("name")
+            field_value = field.get("value")
+            field_type = field.get("type")
+            
+            if field_type == "collection":
+                # Process nested collection
+                attachment_count = 1  # Counter for attachment fields
+                for nested_row in field.findall(".//row"):
+                    for nested_field in nested_row.findall(".//field"):
+                        nested_field_name = nested_field.get("name")
+                        nested_field_value = nested_field.get("value")
+                        # Create new columns for each nested field
+                        row_data[f"Attachments - {nested_field_name}{attachment_count}"] = nested_field_value
+                    attachment_count += 1
+            else:
+                row_data[field_name] = field_value
+        
+        processed_data.append(row_data)
+    
+    # Convert the list of dictionaries to a DataFrame
+    processed_df = pd.DataFrame(processed_data)
+        
+    return processed_df
